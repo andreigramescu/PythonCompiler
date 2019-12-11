@@ -2,13 +2,6 @@ module Main where
 
 import Types
 
-instance Functor Parser where
-  fmap = undefined
-
-instance Applicative Parser where
-  pure  = undefined
-  <*>   = undefined
-
 charP :: Char -> Parser Char
 charP c
   = Parser f
@@ -18,15 +11,20 @@ charP c
       | x == c    = Just (xs, x)
       | otherwise = Nothing
 
--- TODO: make Parser a Functor and an Applicative
--- stringP :: String -> Parser String
--- stringP
---   = sequenceA . map charP
+stringP :: String -> Parser String
+stringP
+  = sequenceA . map charP
 
--- Parsing null
-pyNull :: Parser PyValue
-pyNull
-  = undefined
+-- Parsing None
+pyNone :: Parser PyValue
+pyNone
+  = (\_ -> PyNone) <$> stringP "None"
+
+-- TODO: make Parser an instance of Alternative
+-- Parsing a boolean value
+-- pyBool :: Parser PyValue
+-- pyBool
+--   = stringP "True" <|> stringP "False"
 
 main :: IO ()
 main
