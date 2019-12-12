@@ -13,6 +13,7 @@ data PyValue
 
 newtype Parser a = Parser { runParser :: String -> Maybe (String, a) }
 
+-- Instances of Parser
 instance Functor Parser where
   fmap f (Parser p) = Parser (\input -> do
                         (input', x) <- p input
@@ -27,5 +28,6 @@ instance Applicative Parser where
       return (input'', f x))
 
 instance Alternative Parser where
-  empty = undefined
-  (<|>)   = undefined
+  empty = Parser (\_ -> Nothing)
+  (Parser p1) <|> (Parser p2)
+    = Parser (\input -> (p1 input) <|> (p2 input))
