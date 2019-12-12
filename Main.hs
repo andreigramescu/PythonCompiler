@@ -1,6 +1,7 @@
 module Main where
 
 import Data.Char
+import Data.Maybe
 import Control.Applicative
 import Types
 
@@ -22,11 +23,24 @@ spanP :: (Char -> Bool) -> Parser String
 spanP predicate
   = Parser f
   where
-    f input = if null good
-              then Nothing
-              else Just (bad, good)
+    f input = Just (bad, good)
       where
         (good, bad) = span predicate input
+
+whiteSpaceP :: Parser String
+whiteSpaceP
+  = spanP isSpace
+
+fromNullParsedP :: Parser [a] -> Parser [a]
+-- Pre: The given parser must not parse into Nothing
+fromNullParsedP (Parser p)
+  = Parser f
+  where
+    f input = if null parsed
+              then Nothing
+              else Just res
+            where
+            res@(extra, parsed) = fromJust (p input)
 
 -- Actual parsing
 
@@ -43,17 +57,32 @@ pyBool
 
 pyInt :: Parser PyValue
 pyInt
-  = f <$> spanP (\x -> (ord x >= 48 && ord x <= 57))
+  = f <$> fromNullParsedP (spanP isDigit)
   where
     f = PyInt . read
 
+pyChar :: Parser PyValue
+pyChar
+  = PyChar <$> (charP '\'' *>
+                foldl1 (<|>) (map charP [chr c | c <- [0..127]])
+                <* charP '\'')
+
 pyString :: Parser PyValue
 pyString
-  = PyString <$> (charP '"' *> spanP (/= '"') <* charP '"')
+  = PyString <$> (charP '"' *> characters <* charP '"')
+  where
+    characters = spanP (/= '"')
+
+pyArray :: Parser PyValue
+pyArray
+  = PyArray <$> (charP '[' *> whiteSpaceP *> elements <* whiteSpaceP <* charP ']')
+  where
+    elements = ((:) <$> pyValue <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
+                <|> pure []
 
 pyValue :: Parser PyValue
 pyValue
-  = pyNone <|> pyBool <|> pyInt <|> pyString
+  = pyNone <|> pyBool <|> pyInt <|> pyChar <|> pyString <|> pyArray
 
 main :: IO ()
 main

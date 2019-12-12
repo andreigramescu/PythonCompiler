@@ -4,9 +4,9 @@ import Control.Applicative
 
 data PyValue
   = PyNone
-  | PyVar String
   | PyBool Bool
   | PyInt Int
+  | PyChar Char
   | PyString String
   | PyArray [PyValue]
   deriving (Show, Eq)
