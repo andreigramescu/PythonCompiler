@@ -63,9 +63,13 @@ pyInt
 
 pyChar :: Parser PyValue
 pyChar
-  = PyChar <$> (charP '\'' *>
+  = PyChar <$> ((charP '\'' *>
                 foldl1 (<|>) (map charP [chr c | c <- [0..127]])
                 <* charP '\'')
+                <|>
+                (charP '\"' *>
+                foldl1 (<|>) (map charP [chr c | c <- [0..127]])
+                <* charP '\"'))
 
 pyString :: Parser PyValue
 pyString
@@ -73,16 +77,27 @@ pyString
   where
     characters = spanP (/= '"')
 
-pyArray :: Parser PyValue
-pyArray
-  = PyArray <$> (charP '[' *> whiteSpaceP *> elements <* whiteSpaceP <* charP ']')
+pyList :: Parser PyValue
+pyList
+  = PyList <$> (charP '[' *> whiteSpaceP *> elements <* whiteSpaceP <* charP ']')
   where
     elements = ((:) <$> pyValue <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
                 <|> pure []
 
 pyValue :: Parser PyValue
 pyValue
-  = pyNone <|> pyBool <|> pyInt <|> pyChar <|> pyString <|> pyArray
+  = pyNone <|> pyBool <|> pyInt <|> pyChar <|> pyString <|> pyList
+
+-- Input-Output and testing
+parseFile :: FilePath -> Parser a -> IO (Maybe a)
+parseFile fileName parser
+  = do
+      input <- readFile fileName
+      return (snd <$> runParser parser input)
+
+runTest :: IO (Maybe PyValue)
+runTest
+  = parseFile "./testInput.txt" pyValue
 
 main :: IO ()
 main

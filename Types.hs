@@ -8,12 +8,12 @@ data PyValue
   | PyInt Int
   | PyChar Char
   | PyString String
-  | PyArray [PyValue]
+  | PyList [PyValue]
   deriving (Show, Eq)
 
+-- Parsing type and instances
 newtype Parser a = Parser { runParser :: String -> Maybe (String, a) }
 
--- Instances of Parser
 instance Functor Parser where
   fmap f (Parser p) = Parser (\input -> do
                         (input', x) <- p input
