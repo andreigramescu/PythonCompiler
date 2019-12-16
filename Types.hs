@@ -1,6 +1,6 @@
 module Types where
 
-import Control.Applicative
+import           Control.Applicative
 
 data PyValue
   = PyNone
@@ -28,6 +28,6 @@ instance Applicative Parser where
       return (input'', f x))
 
 instance Alternative Parser where
-  empty = Parser (\_ -> Nothing)
+  empty = Parser (const Nothing)
   (Parser p1) <|> (Parser p2)
-    = Parser (\input -> (p1 input) <|> (p2 input))
+    = Parser (\input -> p1 input <|> p2 input)

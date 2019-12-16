@@ -1,9 +1,9 @@
 module Main where
 
-import Data.Char
-import Data.Maybe
-import Control.Applicative
-import Types
+import           Control.Applicative
+import           Data.Char
+import           Data.Maybe
+import           Types
 
 -- Helper parsers
 charP :: Char -> Parser Char
@@ -17,7 +17,7 @@ charP c
 
 stringP :: String -> Parser String
 stringP
-  = sequenceA . map charP
+  = traverse charP
 
 spanP :: (Char -> Bool) -> Parser String
 spanP predicate
@@ -40,19 +40,19 @@ fromNullParsedP (Parser p)
               then Nothing
               else Just res
             where
-            res@(extra, parsed) = fromJust (p input)
+            res@(_, parsed) = fromJust (p input)
 
 -- Actual parsing
 
 pyNone :: Parser PyValue
 pyNone
-  = (\_ -> PyNone) <$> stringP "None"
+  = PyNone <$ stringP "None"
 
 pyBool :: Parser PyValue
 pyBool
   = f <$> (stringP "True" <|> stringP "False")
   where
-    f "True" = PyBool True
+    f "True"  = PyBool True
     f "False" = PyBool False
 
 pyInt :: Parser PyValue
@@ -64,18 +64,18 @@ pyInt
 pyChar :: Parser PyValue
 pyChar
   = PyChar <$> ((charP '\'' *>
-                foldl1 (<|>) (map charP [chr c | c <- [0..127]])
+                foldl1 (<|>) [charP (chr c) | c <- [0 .. 127]]
                 <* charP '\'')
                 <|>
                 (charP '\"' *>
-                foldl1 (<|>) (map charP [chr c | c <- [0..127]])
+                foldl1 (<|>) [charP (chr c) | c <- [0 .. 127]]
                 <* charP '\"'))
 
 pyString :: Parser PyValue
 pyString
-  = PyString <$> (charP '"' *> characters <* charP '"')
+  = PyString <$> (charP '\"' *> characters <* charP '\"')
   where
-    characters = spanP (/= '"')
+    characters = spanP (/= '\"')
 
 pyList :: Parser PyValue
 pyList
