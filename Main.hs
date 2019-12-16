@@ -44,6 +44,7 @@ fromNullParsedP (Parser p)
 
 -- Actual parsing
 
+-- Parsing values and objects
 pyNone :: Parser PyValue
 pyNone
   = PyNone <$ stringP "None"
@@ -87,6 +88,20 @@ pyList
 pyValue :: Parser PyValue
 pyValue
   = pyNone <|> pyBool <|> pyInt <|> pyChar <|> pyString <|> pyList
+
+-- Parsing procedures
+pyAssignment :: Parser Procedure
+pyAssignment
+  = Parser (\input -> do
+      (extra, varName) <- runParser (spanP isAlpha) input
+      (extra', varValue) <- runParser (whiteSpaceP *> charP '=' *> whiteSpaceP *> pyValue) extra
+      -- NOTE: here is the redundant code; we have varValue inside both the PyVariable and the Assignment
+      return (extra', Assignment (PyVariable varName varValue) varValue)
+      )
+
+pyIf :: Parser Procedure
+pyIf
+  = undefined
 
 -- Input-Output and testing
 parseFile :: FilePath -> Parser a -> IO (Maybe a)

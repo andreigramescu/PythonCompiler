@@ -1,6 +1,6 @@
 module Types where
 
-import           Control.Applicative
+import Control.Applicative
 
 data PyValue
   = PyNone
@@ -10,6 +10,38 @@ data PyValue
   | PyString String
   | PyList [PyValue]
   deriving (Show, Eq)
+
+data PyVariable
+  = PyVariable {
+    getVName :: String,
+    getValue :: PyValue
+  }
+  deriving (Show, Eq)
+
+data PyFunction
+  = PyFunction {
+  getFName :: String,
+  getArguments :: [PyVariable],
+  getBody :: [Procedure]
+  }
+  deriving (Show, Eq)
+
+data BooleanExpression
+  = Atom Bool
+  | Not BooleanExpression
+  | Or BooleanExpression BooleanExpression
+  | And BooleanExpression BooleanExpression
+  deriving (Show, Eq)
+
+data Procedure
+  = Assignment PyVariable PyValue
+  | If BooleanExpression [Procedure]
+  | While BooleanExpression [Procedure]
+  | For PyVariable [PyValue] [Procedure]
+  | FunctionCall PyFunction [PyValue]
+  deriving (Show, Eq)
+
+type Program = [Procedure]
 
 -- Parsing type and instances
 newtype Parser a = Parser { runParser :: String -> Maybe (String, a) }
