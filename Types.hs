@@ -23,6 +23,7 @@ data ArithmeticExpression
   | Multiply ArithmeticExpression ArithmeticExpression
   | Divide ArithmeticExpression ArithmeticExpression
   | Mod ArithmeticExpression ArithmeticExpression
+  | Pow ArithmeticExpression ArithmeticExpression
   deriving (Eq)
 
 data BooleanExpression
@@ -57,7 +58,9 @@ instance Show ArithmeticExpression where
   show (Minus e1 e2)    = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
   show (Multiply e1 e2) = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
   show (Divide e1 e2)   = "(" ++ show e1 ++ ") / (" ++ show e2 ++ ")"
-  show (Mod e1 e2)      = ")" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
+  show (Mod e1 e2)      = "(" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
+  show (Pow e1 e2)      = "(" ++ show e1 ++ ") ** (" ++ show e2 ++ ")"
+
 
 -- Parsing type and instances
 newtype Parser a

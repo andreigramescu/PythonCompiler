@@ -97,7 +97,7 @@ pyDict
       bindings = ((:) <$> (pyPair <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyPair <* whiteSpaceP)) <|> pure []
       pyPair
         = Parser (\input -> do
-            (extra, key) <- runParser (pyValue) input
+            (extra, key) <- runParser pyValue input
             (extra', val) <- runParser (whiteSpaceP *> charP ':' *> whiteSpaceP *> pyValue) extra
             return (extra', (key, val)))
 
@@ -120,33 +120,30 @@ pyArithmeticValue :: Parser ArithmeticExpression
 pyArithmeticValue
   = Value <$> pyValue
 
-pyPlus :: Parser ArithmeticExpression
-pyPlus
-  = (Plus <$> pyArithmeticValue
-          <*> (whiteSpaceP *> charP '+' *> whiteSpaceP *> pyArithmeticExpression))
+pyArithmeticOp :: Char -> Parser ArithmeticExpression
+pyArithmeticOp opChar
+  = (opCon <$> pyArithmeticValue
+          <*> (whiteSpaceP *> charP opChar *> whiteSpaceP *> pyArithmeticExpression))
           <|>
-    (Plus <$> (charP '(' *> whiteSpaceP *> pyArithmeticExpression <* whiteSpaceP <* charP ')')
-          <*> (whiteSpaceP *> charP '+' *> whiteSpaceP *> pyArithmeticExpression))
+    (opCon <$> (charP '(' *> whiteSpaceP *> pyArithmeticExpression <* whiteSpaceP <* charP ')')
+          <*> (whiteSpaceP *> charP opChar *> whiteSpaceP *> pyArithmeticExpression))
+  where
+    ops =[('+', Plus), ('-', Minus), ('*', Multiply), ('/', Divide), ('%', Mod)]
+    opCon
+      = fromJust $ lookup opChar ops
 
-pyMinus :: Parser ArithmeticExpression
-pyMinus
-  = undefined
-
-pyMultiply :: Parser ArithmeticExpression
-pyMultiply
-  = undefined
-
-pyDivide :: Parser ArithmeticExpression
-pyDivide
-  = undefined
-
-pyMod :: Parser ArithmeticExpression
-pyMod
-  = undefined
+pyPow :: Parser ArithmeticExpression
+pyPow
+  = (Pow <$> pyArithmeticValue
+          <*> (whiteSpaceP *> charP '*' *> charP '*' *> whiteSpaceP *> pyArithmeticExpression))
+          <|>
+    (Pow <$> (charP '(' *> whiteSpaceP *> pyArithmeticExpression <* whiteSpaceP <* charP ')')
+          <*> (whiteSpaceP *> charP '*' *> charP '*' *> whiteSpaceP *> pyArithmeticExpression))
 
 pyArithmeticExpression :: Parser ArithmeticExpression
 pyArithmeticExpression
-  = pyPlus <|> pyArithmeticValue
+  = pyArithmeticOp '+' <|> pyArithmeticOp '-' <|> pyArithmeticOp '*'
+  <|> pyArithmeticOp '/' <|> pyArithmeticOp '%' <|> pyPow <|> pyArithmeticValue
 
 -- Parsing boolean expressions
 pyAtom :: Parser BooleanExpression
