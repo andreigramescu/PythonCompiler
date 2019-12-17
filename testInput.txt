@@ -1,1 +1,2 @@
-testingFunc    (["Andrei", "George"], negate (True), 1,2,3)
+{'k' : 7, "king" : "queen", 6 : 9}
+testingFunc(["Andrei", "George"], negate (True), {'k' : 7, "king" : "queen", 6 : 9})

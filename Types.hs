@@ -1,6 +1,6 @@
 module Types where
 
-import Control.Applicative
+import           Control.Applicative
 
 type Name = String
 
@@ -11,6 +11,7 @@ data PyValue
   | PyChar Char
   | PyString String
   | PyList [PyValue]
+  | PyDict [(PyValue, PyValue)]
   | PyVariable Name
   | PyFunctionCall Name [PyValue]
   deriving (Show, Eq)
@@ -43,20 +44,20 @@ data Procedure
 
 data FunctionDeclaration
   = FunctionDeclaration {
-    getName :: Name,
+    getName      :: Name,
     getArguments :: [Name],
-    getBody :: [Procedure]
+    getBody      :: [Procedure]
   }
   deriving (Show, Eq)
 
 -- For clarity
 instance Show ArithmeticExpression where
-  show (Value v) = show v
-  show (Plus e1 e2) = "(" ++ show e1 ++ ") + (" ++ show e2 ++ ")"
-  show (Minus e1 e2) = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
+  show (Value v)        = show v
+  show (Plus e1 e2)     = "(" ++ show e1 ++ ") + (" ++ show e2 ++ ")"
+  show (Minus e1 e2)    = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
   show (Multiply e1 e2) = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
-  show (Divide e1 e2) = "(" ++ show e1 ++ ") / (" ++ show e2 ++ ")"
-  show (Mod e1 e2) = ")" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
+  show (Divide e1 e2)   = "(" ++ show e1 ++ ") / (" ++ show e2 ++ ")"
+  show (Mod e1 e2)      = ")" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
 
 -- Parsing type and instances
 newtype Parser a

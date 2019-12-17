@@ -1,9 +1,9 @@
 module Main where
 
-import Control.Applicative
-import Data.Char
-import Data.Maybe
-import Types
+import           Control.Applicative
+import           Data.Char
+import           Data.Maybe
+import           Types
 
 -- Helper parsers
 charP :: Char -> Parser Char
@@ -85,9 +85,21 @@ pyList
     elements = ((:) <$> (pyValue <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
                 <|> pure []
 
+
 pyVariable :: Parser PyValue
 pyVariable
   = PyVariable <$> fromNullParsedP (spanP isAlpha)
+
+pyDict :: Parser PyValue
+pyDict
+  = PyDict <$> (charP '{' *> whiteSpaceP *> bindings <* whiteSpaceP <* charP '}')
+    where
+      bindings = ((:) <$> (pyPair <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyPair <* whiteSpaceP)) <|> pure []
+      pyPair
+        = Parser (\input -> do
+            (extra, key) <- runParser (pyValue) input
+            (extra', val) <- runParser (whiteSpaceP *> charP ':' *> whiteSpaceP *> pyValue) extra
+            return (extra', (key, val)))
 
 pyFunctionCall :: Parser PyValue
 pyFunctionCall
@@ -101,7 +113,7 @@ pyFunctionCall
 pyValue :: Parser PyValue
 pyValue
   = pyNone <|> pyBool <|> pyInt <|> pyChar <|>
-    pyString <|> pyList <|> pyFunctionCall <|> pyVariable
+    pyString <|> pyList <|> pyDict <|> pyFunctionCall <|> pyVariable
 
 --Parsing arithmetic expressions
 pyArithmeticValue :: Parser ArithmeticExpression
