@@ -1,6 +1,6 @@
 module Types where
 
-import           Control.Applicative
+import Control.Applicative
 
 type Name = String
 
@@ -23,6 +23,7 @@ data ArithmeticExpression
   | Multiply ArithmeticExpression ArithmeticExpression
   | Divide ArithmeticExpression ArithmeticExpression
   | Mod ArithmeticExpression ArithmeticExpression
+  | Pow ArithmeticExpression ArithmeticExpression
   deriving (Eq)
 
 data BooleanExpression
@@ -50,6 +51,27 @@ data FunctionDeclaration
   }
   deriving (Show, Eq)
 
+-- I want to have a class for a python expression so we can just parse generic
+-- 'pyTypes' but I don't know what functions would be useful, so just implement
+-- an identity function?
+class PyInterpretable a where
+  run :: a -> a
+
+instance PyInterpretable FunctionDeclaration where
+  run = id
+
+instance PyInterpretable BooleanExpression where
+  run = id
+
+instance PyInterpretable ArithmeticExpression where
+  run = id
+
+instance PyInterpretable Procedure where
+  run = id
+
+instance PyInterpretable PyValue where
+  run = id
+
 -- For clarity
 instance Show ArithmeticExpression where
   show (Value v)        = show v
@@ -57,7 +79,8 @@ instance Show ArithmeticExpression where
   show (Minus e1 e2)    = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
   show (Multiply e1 e2) = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
   show (Divide e1 e2)   = "(" ++ show e1 ++ ") / (" ++ show e2 ++ ")"
-  show (Mod e1 e2)      = ")" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
+  show (Mod e1 e2)      = "(" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
+  show (Pow e1 e2)      = "(" ++ show e1 ++ ") ** (" ++ show e2 ++ ")"
 
 -- Parsing type and instances
 newtype Parser a
