@@ -2,6 +2,8 @@ module Types where
 
 import Control.Applicative
 
+type Name = String
+
 data PyValue
   = PyNone
   | PyBool Bool
@@ -9,42 +11,58 @@ data PyValue
   | PyChar Char
   | PyString String
   | PyList [PyValue]
+  | PyVariable Name
+  | PyFunctionCall Name [PyValue]
   deriving (Show, Eq)
 
-data PyVariable
-  = PyVariable {
-    getVName :: String,
-    getValue :: PyValue
-  }
-  deriving (Show, Eq)
-
-data PyFunction
-  = PyFunction {
-  getFName :: String,
-  getArguments :: [PyVariable],
-  getBody :: [Procedure]
-  }
-  deriving (Show, Eq)
+data ArithmeticExpression
+  = Value PyValue --Will be either int, var or function call
+  | Plus ArithmeticExpression ArithmeticExpression
+  | Minus ArithmeticExpression ArithmeticExpression
+  | Multiply ArithmeticExpression ArithmeticExpression
+  | Divide ArithmeticExpression ArithmeticExpression
+  | Mod ArithmeticExpression ArithmeticExpression
+  deriving (Eq)
 
 data BooleanExpression
-  = Atom Bool
+  = Atom PyValue -- Will always be a PyBool
+  | Compare Char ArithmeticExpression ArithmeticExpression
+  | BooleanFunctionCall Name [PyValue]
   | Not BooleanExpression
-  | Or BooleanExpression BooleanExpression
   | And BooleanExpression BooleanExpression
+  | Or BooleanExpression BooleanExpression
   deriving (Show, Eq)
 
 data Procedure
-  = Assignment PyVariable PyValue
+  = Assignment Name PyValue
   | If BooleanExpression [Procedure]
   | While BooleanExpression [Procedure]
-  | For PyVariable [PyValue] [Procedure]
-  | FunctionCall PyFunction [PyValue]
+  | For String [PyValue] [Procedure]
+  | VoidFunctionCall Name [PyValue]
   deriving (Show, Eq)
 
-type Program = [Procedure]
+data FunctionDeclaration
+  = FunctionDeclaration {
+    getName :: Name,
+    getArguments :: [Name],
+    getBody :: [Procedure]
+  }
+  deriving (Show, Eq)
+
+-- For clarity
+instance Show ArithmeticExpression where
+  show (Value v) = show v
+  show (Plus e1 e2) = "(" ++ show e1 ++ ") + (" ++ show e2 ++ ")"
+  show (Minus e1 e2) = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
+  show (Multiply e1 e2) = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
+  show (Divide e1 e2) = "(" ++ show e1 ++ ") / (" ++ show e2 ++ ")"
+  show (Mod e1 e2) = ")" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
 
 -- Parsing type and instances
-newtype Parser a = Parser { runParser :: String -> Maybe (String, a) }
+newtype Parser a
+  = Parser {
+  runParser :: String -> Maybe (String, a)
+  }
 
 instance Functor Parser where
   fmap f (Parser p) = Parser (\input -> do

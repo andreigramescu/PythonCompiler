@@ -1,9 +1,9 @@
 module Main where
 
-import           Control.Applicative
-import           Data.Char
-import           Data.Maybe
-import           Types
+import Control.Applicative
+import Data.Char
+import Data.Maybe
+import Types
 
 -- Helper parsers
 charP :: Char -> Parser Char
@@ -82,12 +82,88 @@ pyList :: Parser PyValue
 pyList
   = PyList <$> (charP '[' *> whiteSpaceP *> elements <* whiteSpaceP <* charP ']')
   where
-    elements = ((:) <$> pyValue <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
+    elements = ((:) <$> (pyValue <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
                 <|> pure []
+
+pyVariable :: Parser PyValue
+pyVariable
+  = PyVariable <$> fromNullParsedP (spanP isAlpha)
+
+pyFunctionCall :: Parser PyValue
+pyFunctionCall
+  = PyFunctionCall <$>
+    spanP isAlpha <*>
+    (whiteSpaceP *> charP '(' *> whiteSpaceP *> arguments <* whiteSpaceP <* charP ')')
+    where
+      arguments = ((:) <$> (pyValue <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
+                  <|> pure []
 
 pyValue :: Parser PyValue
 pyValue
-  = pyNone <|> pyBool <|> pyInt <|> pyChar <|> pyString <|> pyList
+  = pyNone <|> pyBool <|> pyInt <|> pyChar <|>
+    pyString <|> pyList <|> pyFunctionCall <|> pyVariable
+
+--Parsing arithmetic expressions
+pyArithmeticValue :: Parser ArithmeticExpression
+pyArithmeticValue
+  = Value <$> pyValue
+
+pyPlus :: Parser ArithmeticExpression
+pyPlus
+  = (Plus <$> pyArithmeticValue
+          <*> (whiteSpaceP *> charP '+' *> whiteSpaceP *> pyArithmeticExpression))
+          <|>
+    (Plus <$> (charP '(' *> whiteSpaceP *> pyArithmeticExpression <* whiteSpaceP <* charP ')')
+          <*> (whiteSpaceP *> charP '+' *> whiteSpaceP *> pyArithmeticExpression))
+
+pyMinus :: Parser ArithmeticExpression
+pyMinus
+  = undefined
+
+pyMultiply :: Parser ArithmeticExpression
+pyMultiply
+  = undefined
+
+pyDivide :: Parser ArithmeticExpression
+pyDivide
+  = undefined
+
+pyMod :: Parser ArithmeticExpression
+pyMod
+  = undefined
+
+pyArithmeticExpression :: Parser ArithmeticExpression
+pyArithmeticExpression
+  = pyPlus <|> pyArithmeticValue
+
+-- Parsing boolean expressions
+pyAtom :: Parser BooleanExpression
+pyAtom
+  = undefined
+
+pyCompare :: Parser BooleanExpression
+pyCompare
+  = undefined
+
+pyBooleanFunctionCall :: Parser BooleanExpression
+pyBooleanFunctionCall
+  = undefined
+
+pyNot :: Parser BooleanExpression
+pyNot
+  = undefined
+
+pyAnd :: Parser BooleanExpression
+pyAnd
+  = undefined
+
+pyOr :: Parser BooleanExpression
+pyOr
+  = undefined
+
+pyBooleanExpression :: Parser BooleanExpression
+pyBooleanExpression
+  = undefined
 
 -- Parsing procedures
 pyAssignment :: Parser Procedure
@@ -96,11 +172,27 @@ pyAssignment
       (extra, varName) <- runParser (spanP isAlpha) input
       (extra', varValue) <- runParser (whiteSpaceP *> charP '=' *> whiteSpaceP *> pyValue) extra
       -- NOTE: here is the redundant code; we have varValue inside both the PyVariable and the Assignment
-      return (extra', Assignment (PyVariable varName varValue) varValue)
+      return (extra', Assignment varName varValue)
       )
 
 pyIf :: Parser Procedure
 pyIf
+  = undefined
+
+pyWhile :: Parser Procedure
+pyWhile
+  = undefined
+
+pyFor :: Parser Procedure
+pyFor
+  = undefined
+
+pyVoidFunctionCall :: Parser Procedure
+pyVoidFunctionCall
+  = undefined
+
+pyProcedure :: Parser Procedure
+pyProcedure
   = undefined
 
 -- Input-Output and testing
