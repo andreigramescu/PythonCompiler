@@ -42,6 +42,18 @@ fromNullParsedP (Parser p)
             where
             res@(_, parsed) = fromJust (p input)
 
+bracketsP :: Parser a -> Parser a
+bracketsP p
+  = stringP "(" *> whiteSpaceP *> p <* whiteSpaceP <* stringP ")"
+
+-- maybeBracketsP :: Parser a -> Parser a
+-- maybeBracketsP p
+--   = p <|> bracketsP p
+
+removeBracketsP :: Parser a -> Parser a
+removeBracketsP p
+  = p <|> removeBracketsP (bracketsP p)
+
 -- Actual parsing
 
 -- Parsing values and objects
@@ -104,7 +116,7 @@ pyDict
 pyFunctionCall :: Parser PyValue
 pyFunctionCall
   = PyFunctionCall <$>
-    spanP isAlpha <*>
+    fromNullParsedP (spanP isAlpha) <*>
     (whiteSpaceP *> charP '(' *> whiteSpaceP *> arguments <* whiteSpaceP <* charP ')')
     where
       arguments = ((:) <$> (pyValue <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
@@ -118,7 +130,9 @@ pyValue
 --Parsing arithmetic expressions
 pyArithmeticValue :: Parser ArithmeticExpression
 pyArithmeticValue
-  = Value <$> pyValue
+  = ArithmeticValue <$> removeBracketsP p -- maybeBracketsP (ArithmeticValue <$> p) <|> bracketsP pyArithmeticValue
+  where
+    p = pyInt <|> pyFunctionCall <|> pyVariable
 
 pyArithmeticOp :: Char -> Parser ArithmeticExpression
 pyArithmeticOp opChar

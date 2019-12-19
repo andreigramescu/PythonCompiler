@@ -17,7 +17,7 @@ data PyValue
   deriving (Show, Eq)
 
 data ArithmeticExpression
-  = Value PyValue --Will be either int, var or function call
+  = ArithmeticValue PyValue --Will be either int, var or function call
   | Plus ArithmeticExpression ArithmeticExpression
   | Minus ArithmeticExpression ArithmeticExpression
   | Multiply ArithmeticExpression ArithmeticExpression
@@ -53,7 +53,7 @@ data FunctionDeclaration
 
 -- For clarity
 instance Show ArithmeticExpression where
-  show (Value v)        = show v
+  show (ArithmeticValue v)        = show v
   show (Plus e1 e2)     = "(" ++ show e1 ++ ") + (" ++ show e2 ++ ")"
   show (Minus e1 e2)    = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
   show (Multiply e1 e2) = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
