@@ -61,7 +61,6 @@ instance Show ArithmeticExpression where
   show (Mod e1 e2)      = "(" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
   show (Pow e1 e2)      = "(" ++ show e1 ++ ") ** (" ++ show e2 ++ ")"
 
-
 -- Parsing type and instances
 newtype Parser a
   = Parser {

@@ -42,40 +42,43 @@ fromNullParsedP (Parser p)
             where
             res@(_, parsed) = fromJust (p input)
 
-bracketsP :: Parser a -> Parser a
-bracketsP p
-  = stringP "(" *> whiteSpaceP *> p <* whiteSpaceP <* stringP ")"
-
--- maybeBracketsP :: Parser a -> Parser a
--- maybeBracketsP p
---   = p <|> bracketsP p
-
 removeBracketsP :: Parser a -> Parser a
 removeBracketsP p
-  = p <|> removeBracketsP (bracketsP p)
+  = Parser f
+  where
+    f input
+      = do
+          (input', firstBrackets) <- runParser (many (charP '(' <* whiteSpaceP)) input
+          (input'', valParsed)    <- runParser p input'
+          (input''', lastBrackets) <- runParser (many (whiteSpaceP *> charP ')')) input''
+          if length firstBrackets == length lastBrackets
+          then return (input''', valParsed)
+          else Nothing
 
 -- Actual parsing
 
 -- Parsing values and objects
-pyNone :: Parser PyValue
-pyNone
+pyNone' :: Parser PyValue
+pyNone'
   = PyNone <$ stringP "None"
 
-pyBool :: Parser PyValue
-pyBool
+pyBool' :: Parser PyValue
+pyBool'
   = f <$> (stringP "True" <|> stringP "False")
   where
     f "True"  = PyBool True
     f "False" = PyBool False
 
-pyInt :: Parser PyValue
-pyInt
-  = f <$> fromNullParsedP (spanP isDigit)
+pyInt' :: Parser PyValue
+pyInt'
+  = f <$> ( nextDigitsP <|>
+           (:) <$> charP '-' <*> nextDigitsP)
   where
     f = PyInt . read
+    nextDigitsP = fromNullParsedP (spanP isDigit)
 
-pyChar :: Parser PyValue
-pyChar
+pyChar' :: Parser PyValue
+pyChar'
   = PyChar <$> ((charP '\'' *>
                 foldl1 (<|>) [charP (chr c) | c <- [0 .. 127]]
                 <* charP '\'')
@@ -84,26 +87,26 @@ pyChar
                 foldl1 (<|>) [charP (chr c) | c <- [0 .. 127]]
                 <* charP '\"'))
 
-pyString :: Parser PyValue
-pyString
+pyString' :: Parser PyValue
+pyString'
   = PyString <$> (charP '\"' *> characters <* charP '\"')
   where
     characters = spanP (/= '\"')
 
-pyList :: Parser PyValue
-pyList
+pyList' :: Parser PyValue
+pyList'
   = PyList <$> (charP '[' *> whiteSpaceP *> elements <* whiteSpaceP <* charP ']')
   where
     elements = ((:) <$> (pyValue <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
                 <|> pure []
 
 
-pyVariable :: Parser PyValue
-pyVariable
+pyVariable' :: Parser PyValue
+pyVariable'
   = PyVariable <$> fromNullParsedP (spanP isAlpha)
 
-pyDict :: Parser PyValue
-pyDict
+pyDict' :: Parser PyValue
+pyDict'
   = PyDict <$> (charP '{' *> whiteSpaceP *> bindings <* whiteSpaceP <* charP '}')
     where
       bindings = ((:) <$> (pyPair <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyPair <* whiteSpaceP)) <|> pure []
@@ -113,14 +116,24 @@ pyDict
             (extra', val) <- runParser (whiteSpaceP *> charP ':' *> whiteSpaceP *> pyValue) extra
             return (extra', (key, val)))
 
-pyFunctionCall :: Parser PyValue
-pyFunctionCall
+pyFunctionCall' :: Parser PyValue
+pyFunctionCall'
   = PyFunctionCall <$>
     fromNullParsedP (spanP isAlpha) <*>
     (whiteSpaceP *> charP '(' *> whiteSpaceP *> arguments <* whiteSpaceP <* charP ')')
     where
       arguments = ((:) <$> (pyValue <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
                   <|> pure []
+
+pyNone         = removeBracketsP pyNone'
+pyBool         = removeBracketsP pyBool'
+pyInt          = removeBracketsP pyInt'
+pyChar         = removeBracketsP pyChar'
+pyString       = removeBracketsP pyString'
+pyList         = removeBracketsP pyList'
+pyVariable     = removeBracketsP pyVariable'
+pyDict         = removeBracketsP pyDict'
+pyFunctionCall = removeBracketsP pyFunctionCall'
 
 pyValue :: Parser PyValue
 pyValue
@@ -130,7 +143,7 @@ pyValue
 --Parsing arithmetic expressions
 pyArithmeticValue :: Parser ArithmeticExpression
 pyArithmeticValue
-  = ArithmeticValue <$> removeBracketsP p -- maybeBracketsP (ArithmeticValue <$> p) <|> bracketsP pyArithmeticValue
+  = ArithmeticValue <$> p
   where
     p = pyInt <|> pyFunctionCall <|> pyVariable
 
