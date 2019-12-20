@@ -42,18 +42,24 @@ fromNullParsedP (Parser p)
             where
             res@(_, parsed) = fromJust (p input)
 
+-- We will have to settle on parsing a single pair of brackets for now
+-- since it is really really hard to parse (((((((*something*))))))).
+-- The commented solutions works but only when *something* does not start
+-- or end with '(' or ')'. ((((a + b) * c))) cannot be parsed, for instance.
+-- If you have any ideas please do modify this function.
 removeBracketsP :: Parser a -> Parser a
 removeBracketsP p
-  = Parser f
-  where
-    f input
-      = do
-          (input', firstBrackets) <- runParser (many (charP '(' <* whiteSpaceP)) input
-          (input'', valParsed)    <- runParser p input'
-          (input''', lastBrackets) <- runParser (many (whiteSpaceP *> charP ')')) input''
-          if length firstBrackets == length lastBrackets
-          then return (input''', valParsed)
-          else Nothing
+  = p <|> (stringP "(" *> whiteSpaceP *> p <* whiteSpaceP <* stringP ")")
+  -- = p <|> Parser f
+  -- where
+  --   f input
+  --     = do
+  --         (input', firstBrackets) <- runParser (many (charP '(' <* whiteSpaceP)) input
+  --         (input'', valParsed)    <- runParser p input'
+  --         (input''', lastBrackets) <- runParser (many (whiteSpaceP *> charP ')')) input''
+  --         if length firstBrackets == length lastBrackets
+  --         then return (input''', valParsed)
+  --         else Nothing
 
 -- Actual parsing
 
