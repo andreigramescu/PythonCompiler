@@ -29,7 +29,7 @@ data ArithmeticExpression
 data BooleanExpression
   = Atom PyValue -- Will always be a PyBool
   | Compare Char ArithmeticExpression ArithmeticExpression
-  | BooleanFunctionCall Name [PyValue]
+  -- | BooleanFunctionCall Name [PyValue]
   | Not BooleanExpression
   | And BooleanExpression BooleanExpression
   | Or BooleanExpression BooleanExpression

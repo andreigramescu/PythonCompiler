@@ -181,19 +181,28 @@ pyArithmeticExpression
 -- Parsing boolean expressions
 pyAtom :: Parser BooleanExpression
 pyAtom
-  = undefined
+  = Atom <$> pyValue  -- It is for the interpreting stage to decide if it is boolean
 
 pyCompare :: Parser BooleanExpression
 pyCompare
   = undefined
 
-pyBooleanFunctionCall :: Parser BooleanExpression
-pyBooleanFunctionCall
-  = undefined
+-- I dont think we need BooleanFunctionCall. This is covered under a normal pyValue
+-- pyBooleanFunctionCall :: Parser BooleanExpression
+-- pyBooleanFunctionCall
+--   = undefined
 
 pyNot :: Parser BooleanExpression
 pyNot
-  = undefined
+  -- Pretty gross I know. Feel free to manipulate the parsers without input.
+  -- That would be more concise but I dont immediately see how
+  = Parser (\input -> do
+      (extra, _)          <- runParser (stringP "not") input
+      (extra', _)         <- runParser (charP ' ') extra
+      (extra'', _)        <- runParser whiteSpaceP extra'
+      (extra''', boolExp) <- runParser pyBooleanExpression extra''
+      return (extra''', Not boolExp)
+  )
 
 pyAnd :: Parser BooleanExpression
 pyAnd
@@ -205,7 +214,7 @@ pyOr
 
 pyBooleanExpression :: Parser BooleanExpression
 pyBooleanExpression
-  = undefined
+  = pyAtom <|> pyNot
 
 -- Parsing procedures
 pyAssignment :: Parser Procedure
