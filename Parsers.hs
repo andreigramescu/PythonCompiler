@@ -126,7 +126,11 @@ pyList'
 
 pyVariable' :: Parser PyValue
 pyVariable'
-  = PyVariable <$> fromNullParsedP (spanP isAlpha)
+  = PyVariable <$> fromNullParsedP (Parser (\input -> do
+                                            (extra, name) <- runParser (spanP isAlpha) input
+                                            if name == "or" || name == "and" || name == "not"
+                                            then return (input, "")
+                                            else return (extra, name)))
 
 pyDict' :: Parser PyValue
 pyDict'
@@ -162,6 +166,8 @@ pyValue :: Parser PyValue
 pyValue
   = pyNone <|> pyBool <|> pyInt <|> pyChar <|>
     pyString <|> pyList <|> pyDict <|> pyFunctionCall <|> pyVariable
+    <|> (PyArithmeticExpression <$> pyArithmeticExpression)
+    <|> (PyBooleanExpression <$> pyBooleanExpression)
 
 --Parsing arithmetic expressions
 pyArithmeticValue :: Parser ArithmeticExpression
@@ -176,9 +182,8 @@ pyArithmeticExpression
       then Nothing
       else return (extra, (fst . convertBack . reverse . postfix) expr))
   where
-    opP = Left <$> (stringP "(" <|> stringP ")" <|> foldl1 (<|>) (map stringP ops))
+    opP = Left <$> (stringP "(" <|> stringP ")" <|> foldl1 (<|>) (map stringP arithmOps))
     valP = Right <$> pyArithmeticValue
-    -- Converts from infix to postfix notation
     postfix :: [Either Symbol ArithmeticExpression] -> [Either Symbol ArithmeticExpression]
     postfix = postfix' []
       where
@@ -198,7 +203,7 @@ pyArithmeticExpression
     convertBack [] = error "A case yet to be solved!"
     convertBack (Left x : expr') = ((lookUp x equivTable) nextExpression' nextExpression, extra)
       where
-        equivTable = zip ops [Pow, Mod, Multiply, Divide, Plus, Minus]
+        equivTable = zip arithmOps [Pow, Mod, Multiply, Divide, Plus, Minus]
         (nextExpression, extra') = convertBack expr'
         (nextExpression', extra) = convertBack extra'
     convertBack (Right x : expr') = (x, expr')
@@ -211,39 +216,35 @@ pyArithmeticExpression
 pyAtom :: Parser BooleanExpression
 pyAtom
   = Atom <$> pyValue  -- It is for the interpreting stage to decide if it is boolean
+    
+-- Pretty gross I know. Feel free to manipulate the parsers without input.
+-- That would be more concise but I dont immediately see how
+-- pyNot :: Parser BooleanExpression
+-- pyNot
+--  = Parser (\input -> do
+--    (extra, _)          <- runParser (stringP "not") input
+--    (extra', _)         <- runParser (charP ' ') extra
+--    (extra'', _)        <- runParser whiteSpaceP extra'
+--    (extra''', boolExp) <- runParser pyBooleanExpression extra''
+--    return (extra''', Not boolExp)
+--    )
+-- could be just stringP "not " *> whiteSpaceP *> pyBooleanExpression ?
+
+pyPurelyBooleanExpression :: Parser BooleanExpression
+-- This will be similar to the ArithmeticExpression parser
+-- and will parse pure boolean expressions that have not and or operators
+pyPurelyBooleanExpression
+  = undefined
 
 pyCompare :: Parser BooleanExpression
+-- Will leave it with pyValues, for now
+-- I am pretty sure we will be changing this in the future
 pyCompare
-  = undefined
-
--- I dont think we need BooleanFunctionCall. This is covered under a normal pyValue
--- pyBooleanFunctionCall :: Parser BooleanExpression
--- pyBooleanFunctionCall
---   = undefined
-
-pyNot :: Parser BooleanExpression
-pyNot
-  -- Pretty gross I know. Feel free to manipulate the parsers without input.
-  -- That would be more concise but I dont immediately see how
-  = Parser (\input -> do
-      (extra, _)          <- runParser (stringP "not") input
-      (extra', _)         <- runParser (charP ' ') extra
-      (extra'', _)        <- runParser whiteSpaceP extra'
-      (extra''', boolExp) <- runParser pyBooleanExpression extra''
-      return (extra''', Not boolExp)
-  )
-
-pyAnd :: Parser BooleanExpression
-pyAnd
-  = undefined
-
-pyOr :: Parser BooleanExpression
-pyOr
-  = undefined
+  = Compare <$> pyValue <* whiteSpaceP <*> foldl1 (<|>) (map stringP comps) <* whiteSpaceP <*> pyValue
 
 pyBooleanExpression :: Parser BooleanExpression
 pyBooleanExpression
-  = pyAtom <|> pyNot
+  = pyPurelyBooleanExpression <|> pyCompare
 
 -- Parsing procedures
 pyAssignment :: Parser Procedure

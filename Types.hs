@@ -12,6 +12,8 @@ data PyValue
   | PyDict [(PyValue, PyValue)]
   | PyVariable Name
   | PyFunctionCall Name [PyValue]
+  | PyArithmeticExpression ArithmeticExpression
+  | PyBooleanExpression BooleanExpression
   deriving (Show, Eq)
 
 data ArithmeticExpression
@@ -26,8 +28,8 @@ data ArithmeticExpression
 
 data BooleanExpression
   = Atom PyValue
-  | Compare Char ArithmeticExpression ArithmeticExpression
-  | BooleanFunctionCall Name [PyValue]
+  | Compare PyValue Symbol PyValue
+  -- Repositioned so that we can easily apply <$> and <*>
   | Not BooleanExpression
   | And BooleanExpression BooleanExpression
   | Or BooleanExpression BooleanExpression
@@ -51,13 +53,22 @@ data FunctionDeclaration
 
 type Symbol = String
 
-ops :: [Symbol]
-ops
+arithmOps :: [Symbol]
+arithmOps
   = ["**", "%", "*", "/", "+", "-"]
+
+booleanOps :: [Symbol]
+booleanOps
+  = ["not", "and", "or"]
+
+comps :: [Symbol]
+comps
+  = ["<", ">", "<=", ">=", "=="]
 
 precedences :: [(Symbol, Int)]
 precedences
-  = zip ops [3, 2, 2, 2, 1, 1]
+  =  zip (arithmOps ++ booleanOps) [3, 2, 2, 2, 1, 1,
+                                    3, 2, 1]
 
 instance Show ArithmeticExpression where
   show (ArithmeticValue v)        = show v
