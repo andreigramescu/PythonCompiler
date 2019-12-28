@@ -28,6 +28,13 @@ instance Alternative Parser where
   (Parser p1) <|> (Parser p2)
     = Parser (\input -> p1 input <|> p2 input)
 
+instance Monad Parser where
+  return x = Parser (\input -> Just (input, x))
+  p >>= f = Parser (\input -> do
+                      (extra, val) <- runParser p input
+                      (extra', val') <- runParser (f val) extra
+                      return (extra', val'))
+
 -- Helper parsers
 charP :: Char -> Parser Char
 charP c
@@ -216,7 +223,7 @@ pyArithmeticExpression
 pyAtom :: Parser BooleanExpression
 pyAtom
   = Atom <$> pyValue  -- It is for the interpreting stage to decide if it is boolean
-    
+
 -- Pretty gross I know. Feel free to manipulate the parsers without input.
 -- That would be more concise but I dont immediately see how
 -- pyNot :: Parser BooleanExpression
