@@ -5,9 +5,15 @@ import           Control.Applicative
 import           Data.Char
 import           Data.Maybe
 
-newtype Parser a
+{-newtype Parser a
   = Parser {
   runParser :: String -> Maybe (String, a)
+  }
+-}
+
+newtype Parser m a
+  = Parser {
+  runParser :: String -> m (String, a)
   }
 
 instance Functor Parser where
@@ -28,6 +34,8 @@ instance Alternative Parser where
   (Parser p1) <|> (Parser p2)
     = Parser (\input -> p1 input <|> p2 input)
 
+--STATET
+
 instance Monad Parser where
   return x = Parser (\input -> Just (input, x))
   p >>= f = Parser (\input -> do
@@ -35,15 +43,37 @@ instance Monad Parser where
                       (extra', val') <- runParser (f val) extra
                       return (extra', val'))
 
--- Helper parsers
 charP :: Char -> Parser Char
-charP c
-  = Parser f
+charP c = satisfyP (== c)
+
+-- Helper parsers
+satisfyP :: (Char -> Bool) -> Parser Char
+satisfyP f = itemP >?> f
+
+itemP :: Parser Char
+itemP = Parser f
   where
-    f "" = Nothing
-    f (x : xs)
-      | x == c    = Just (xs, x)
-      | otherwise = Nothing
+    f "" = empty
+    f (c:cs) = pure (cs, c)
+
+class Applicative f => Selective f where
+  branch :: f (Either a b) -> f (a -> c) -> f (b -> c) -> f c
+
+instance Selective Parser where
+  branch b p q = b >>= (\x -> case x of
+    Left x -> p <*> pure x
+    Right y -> q <*> pure y)
+
+select :: Selective f => f (Either a b) -> f (a -> b) -> f b
+select p q = branch p q (pure id)
+
+(>?>) :: Parser a -> (a -> Bool) -> Parser a
+p >?> f = select (g <$> p) empty
+  where
+    g x 
+      | f x = Right x
+      | otherwise = Left ()
+      
 
 stringP :: String -> Parser String
 stringP
@@ -75,13 +105,13 @@ fromNullParsedP (Parser p)
 removeBracketsP :: Parser a -> Parser a
 removeBracketsP p
   = p
-    <|> bracketsP p
-    <|> bracketsP (bracketsP p)
+    <|> bracketsP (removeBracketsP p)
+    {-<|> bracketsP (bracketsP p)
     <|> bracketsP (bracketsP (bracketsP p))
     <|> bracketsP (bracketsP (bracketsP (bracketsP p)))
     <|> bracketsP (bracketsP (bracketsP (bracketsP (bracketsP p))))
     <|> bracketsP (bracketsP (bracketsP (bracketsP (bracketsP (bracketsP p)))))
-    <|> bracketsP (bracketsP (bracketsP (bracketsP (bracketsP (bracketsP (bracketsP p))))))
+    <|> bracketsP (bracketsP (bracketsP (bracketsP (bracketsP (bracketsP (bracketsP p))))))-}
     where
       bracketsP p = charP '(' *> whiteSpaceP *> p <* whiteSpaceP <* charP ')'
 
@@ -94,15 +124,15 @@ pyNone'
 
 pyBool' :: Parser PyValue
 pyBool'
-  = f <$> (stringP "True" <|> stringP "False")
-  where
-    f "True"  = PyBool True
-    f "False" = PyBool False
+  = PyBool True <$ stringP "True" <|> PyBool False <$ stringP "False"
+
+(<:>) :: Parser a -> Parser [a] -> Parser [a]
+(<:>) = liftA2 (:)
 
 pyInt' :: Parser PyValue
 pyInt'
   = f <$> ( nextDigitsP <|>
-           (:) <$> charP '-' <*> nextDigitsP)
+           charP '-' <:> nextDigitsP)
   where
     f = PyInt . read
     nextDigitsP = fromNullParsedP (spanP isDigit)
@@ -180,6 +210,25 @@ pyValue
 pyArithmeticValue :: Parser ArithmeticExpression
 pyArithmeticValue
   = ArithmeticValue <$> (pyInt <|> pyFunctionCall <|> pyVariable)
+
+{-data Ops a = LeftAssoc (Parser (a -> a -> a))
+           | RightAssoc (Parser (a -> a -> a))
+
+prec :: Parser a -> [Ops a] -> Parser a
+prec atom ops = foldl atom (map convert ops)
+  where
+    convert (LeftAssoc op) p = chainl1 p op
+    convert (RightAssoc op) p = chainr1 p op
+
+chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+chainl1 p op = flip (foldl ($)) <$> p <*> many (flip <$> op <*> p)
+
+chainr1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+chainr1 p op = foldr (flip ($)) <$> many (p <**> op) <*> p
+
+expr = prec number [LeftAssoc ((*) <$ char '*'),
+                    LeftAssoc ((-) <$ char '-'),
+                    LeftAssoc ((+) <$ char '+')] -}
 
 pyArithmeticExpression :: Parser ArithmeticExpression
 pyArithmeticExpression
