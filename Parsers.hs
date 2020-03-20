@@ -238,10 +238,19 @@ pyAtom
 -- could be just stringP "not " *> whiteSpaceP *> pyBooleanExpression ?
 
 pyPurelyBooleanExpression :: Parser BooleanExpression
--- This will be similar to the ArithmeticExpression parser
--- and will parse pure boolean expressions that have not and or operators
 pyPurelyBooleanExpression
-  = undefined
+  -- Use Parser Monad do notation
+  = do
+      symbols <- many ((opP <|> valP) <* whiteSpaceP)
+      if symbols == []
+      then return (Atom PyNone)  -- for now
+      else return ((fst . convertBack . reverse . postfix) symbols)
+  where
+    postfix = undefined
+    convertBack = undefined
+    opP = Left <$> (stringP "(" <|> stringP ")" <|> foldl1 (<|>) (map stringP booleanOps))
+    valP = Right <$> pyAtom
+
 
 pyCompare :: Parser BooleanExpression
 -- Will leave it with pyValues, for now
