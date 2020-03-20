@@ -173,16 +173,16 @@ pyValue :: Parser PyValue
 pyValue
   = pyNone <|> pyBool <|> pyInt <|> pyChar <|>
     pyString <|> pyList <|> pyDict <|> pyFunctionCall <|> pyVariable
-    <|> (PyArithmeticExpression <$> pyArithmeticExpression)
-    <|> (PyBooleanExpression <$> pyBooleanExpression)
+    <|> (PyArithmExpr <$> pyArithmExpr)
+    <|> (PyBoolExpr <$> pyBoolExpr)
 
 --Parsing arithmetic expressions
-pyArithmeticValue :: Parser ArithmeticExpression
-pyArithmeticValue
-  = ArithmeticValue <$> (pyInt <|> pyFunctionCall <|> pyVariable)
+pyArithmVal :: Parser ArithmExpr
+pyArithmVal
+  = ArithmVal <$> (pyInt <|> pyFunctionCall <|> pyVariable)
 
-pyArithmeticExpression :: Parser ArithmeticExpression
-pyArithmeticExpression
+pyArithmExpr :: Parser ArithmExpr
+pyArithmExpr
   = Parser (\input -> do
       (extra, expr) <- runParser (many ((opP <|> valP) <* whiteSpaceP)) input
       if expr == []
@@ -190,8 +190,8 @@ pyArithmeticExpression
       else return (extra, (fst . convertBack . reverse . postfix) expr))
   where
     opP = Left <$> (stringP "(" <|> stringP ")" <|> foldl1 (<|>) (map stringP arithmOps))
-    valP = Right <$> pyArithmeticValue
-    postfix :: [Either Symbol ArithmeticExpression] -> [Either Symbol ArithmeticExpression]
+    valP = Right <$> pyArithmVal
+    postfix :: [Either Symbol ArithmExpr] -> [Either Symbol ArithmExpr]
     postfix = postfix' []
       where
         postfix' stack [] = map Left stack
@@ -205,12 +205,12 @@ pyArithmeticExpression
             newStack' = x : newStack''
         postfix' stack ((Right x) : expr')
           = Right x : postfix' stack expr'
-    -- From reversed postfix to the needed expression of type ArithmeticExpression
-    convertBack :: [Either Symbol ArithmeticExpression] -> (ArithmeticExpression, [Either Symbol ArithmeticExpression])
+    -- From reversed postfix to the needed expression of type ArithmExpr
+    convertBack :: [Either Symbol ArithmExpr] -> (ArithmExpr, [Either Symbol ArithmExpr])
     convertBack [] = error "A case yet to be solved!"
     convertBack (Left x : expr') = ((lookUp x equivTable) nextExpression' nextExpression, extra)
       where
-        equivTable = zip arithmOps [Pow, Mod, Multiply, Divide, Plus, Minus]
+        equivTable = zip arithmOps [Pow, Mod, Mul, Div, Plus, Minus]
         (nextExpression, extra') = convertBack expr'
         (nextExpression', extra) = convertBack extra'
     convertBack (Right x : expr') = (x, expr')
@@ -220,25 +220,25 @@ pyArithmeticExpression
       = ((.) . (.)) fromJust lookup
 
 -- Parsing boolean expressions
-pyAtom :: Parser BooleanExpression
+pyAtom :: Parser BoolExpr
 pyAtom
   = Atom <$> pyValue  -- It is for the interpreting stage to decide if it is boolean
 
 -- Pretty gross I know. Feel free to manipulate the parsers without input.
 -- That would be more concise but I dont immediately see how
--- pyNot :: Parser BooleanExpression
+-- pyNot :: Parser BoolExpr
 -- pyNot
 --  = Parser (\input -> do
 --    (extra, _)          <- runParser (stringP "not") input
 --    (extra', _)         <- runParser (charP ' ') extra
 --    (extra'', _)        <- runParser whiteSpaceP extra'
---    (extra''', boolExp) <- runParser pyBooleanExpression extra''
+--    (extra''', boolExp) <- runParser pyBoolExpr extra''
 --    return (extra''', Not boolExp)
 --    )
--- could be just stringP "not " *> whiteSpaceP *> pyBooleanExpression ?
+-- could be just stringP "not " *> whiteSpaceP *> pyBoolExpr ?
 
-pyPurelyBooleanExpression :: Parser BooleanExpression
-pyPurelyBooleanExpression
+pyPurelyBoolExpr :: Parser BoolExpr
+pyPurelyBoolExpr
   -- Use Parser Monad do notation
   = do
       symbols <- many ((opP <|> valP) <* whiteSpaceP)
@@ -252,15 +252,15 @@ pyPurelyBooleanExpression
     valP = Right <$> pyAtom
 
 
-pyCompare :: Parser BooleanExpression
+pyComp :: Parser BoolExpr
 -- Will leave it with pyValues, for now
 -- I am pretty sure we will be changing this in the future
-pyCompare
-  = Compare <$> pyValue <* whiteSpaceP <*> foldl1 (<|>) (map stringP comps) <* whiteSpaceP <*> pyValue
+pyComp
+  = Comp <$> pyValue <* whiteSpaceP <*> foldl1 (<|>) (map stringP comps) <* whiteSpaceP <*> pyValue
 
-pyBooleanExpression :: Parser BooleanExpression
-pyBooleanExpression
-  = pyPurelyBooleanExpression <|> pyCompare
+pyBoolExpr :: Parser BoolExpr
+pyBoolExpr
+  = pyPurelyBoolExpr <|> pyComp
 
 -- Parsing procedures
 pyAssignment :: Parser Procedure

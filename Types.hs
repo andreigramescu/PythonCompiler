@@ -12,33 +12,33 @@ data PyValue
   | PyDict [(PyValue, PyValue)]
   | PyVariable Name
   | PyFunctionCall Name [PyValue]
-  | PyArithmeticExpression ArithmeticExpression
-  | PyBooleanExpression BooleanExpression
+  | PyArithmExpr ArithmExpr
+  | PyBoolExpr BoolExpr
   deriving (Show, Eq)
 
-data ArithmeticExpression
-  = ArithmeticValue PyValue
-  | Plus ArithmeticExpression ArithmeticExpression
-  | Minus ArithmeticExpression ArithmeticExpression
-  | Multiply ArithmeticExpression ArithmeticExpression
-  | Divide ArithmeticExpression ArithmeticExpression
-  | Mod ArithmeticExpression ArithmeticExpression
-  | Pow ArithmeticExpression ArithmeticExpression
+data ArithmExpr
+  = ArithmVal PyValue
+  | Plus ArithmExpr ArithmExpr
+  | Minus ArithmExpr ArithmExpr
+  | Mul ArithmExpr ArithmExpr
+  | Div ArithmExpr ArithmExpr
+  | Mod ArithmExpr ArithmExpr
+  | Pow ArithmExpr ArithmExpr
   deriving (Eq)
 
-data BooleanExpression
+data BoolExpr
   = Atom PyValue
-  | Compare PyValue Symbol PyValue
+  | Comp PyValue Symbol PyValue
   -- Repositioned so that we can easily apply <$> and <*>
-  | Not BooleanExpression
-  | And BooleanExpression BooleanExpression
-  | Or BooleanExpression BooleanExpression
+  | Not BoolExpr
+  | And BoolExpr BoolExpr
+  | Or BoolExpr BoolExpr
   deriving (Show, Eq)
 
 data Procedure
   = Assignment Name PyValue
-  | If BooleanExpression [Procedure]
-  | While BooleanExpression [Procedure]
+  | If BoolExpr [Procedure]
+  | While BoolExpr [Procedure]
   | For String [PyValue] [Procedure]
   | VoidFunctionCall Name [PyValue]
   deriving (Show, Eq)
@@ -70,11 +70,11 @@ precedences
   =  zip (arithmOps ++ booleanOps) [3, 2, 2, 2, 1, 1,
                                     3, 2, 1]
 
-instance Show ArithmeticExpression where
-  show (ArithmeticValue v)        = show v
+instance Show ArithmExpr where
+  show (ArithmVal v)        = show v
   show (Plus e1 e2)     = "(" ++ show e1 ++ ") + (" ++ show e2 ++ ")"
   show (Minus e1 e2)    = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
-  show (Multiply e1 e2) = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
-  show (Divide e1 e2)   = "(" ++ show e1 ++ ") / (" ++ show e2 ++ ")"
+  show (Mul e1 e2) = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
+  show (Div e1 e2)   = "(" ++ show e1 ++ ") / (" ++ show e2 ++ ")"
   show (Mod e1 e2)      = "(" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
   show (Pow e1 e2)      = "(" ++ show e1 ++ ") ** (" ++ show e2 ++ ")"
