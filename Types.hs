@@ -29,11 +29,10 @@ data ArithmExpr
 data BoolExpr
   = Atom PyValue
   | Comp PyValue Symbol PyValue
-  -- Repositioned so that we can easily apply <$> and <*>
   | Not BoolExpr
   | And BoolExpr BoolExpr
   | Or BoolExpr BoolExpr
-  deriving (Show, Eq)
+  deriving (Eq)
 
 data Procedure
   = Assignment Name PyValue
@@ -71,10 +70,18 @@ precedences
                                     3, 2, 1]
 
 instance Show ArithmExpr where
-  show (ArithmVal v)        = show v
-  show (Plus e1 e2)     = "(" ++ show e1 ++ ") + (" ++ show e2 ++ ")"
-  show (Minus e1 e2)    = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
-  show (Mul e1 e2) = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
+  show (ArithmVal v) = show v
+  show (Plus e1 e2)  = "(" ++ show e1 ++ ") + (" ++ show e2 ++ ")"
+  show (Minus e1 e2) = "(" ++ show e1 ++ ") - (" ++ show e2 ++ ")"
+  show (Mul e1 e2)   = "(" ++ show e1 ++ ") * (" ++ show e2 ++ ")"
   show (Div e1 e2)   = "(" ++ show e1 ++ ") / (" ++ show e2 ++ ")"
-  show (Mod e1 e2)      = "(" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
-  show (Pow e1 e2)      = "(" ++ show e1 ++ ") ** (" ++ show e2 ++ ")"
+  show (Mod e1 e2)   = "(" ++ show e1 ++ ") % (" ++ show e2 ++ ")"
+  show (Pow e1 e2)   = "(" ++ show e1 ++ ") ** (" ++ show e2 ++ ")"
+
+instance Show BoolExpr where
+  show (Atom a) = show a
+  show (Comp e1 cmp e2)  = "(" ++ show e1 ++ ")" ++
+                          show cmp ++ "(" ++ show e2 ++ ")"
+  show (Not e)  = "-" ++ "(" ++ show e ++ ")"
+  show (And e1 e2) = "(" ++ show e1 ++ ") & (" ++ show e2 ++ ")"
+  show (Or e1 e2)  = "(" ++ show e1 ++ ") | (" ++ show e2 ++ ")"

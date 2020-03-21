@@ -35,7 +35,9 @@ instance Monad Parser where
                       (extra', val') <- runParser (f val) extra
                       return (extra', val'))
 
--- Helper parsers
+
+--  + + + + + + + + + Helper parsers + + + + + + + + +
+
 charP :: Char -> Parser Char
 charP c
   = Parser f
@@ -61,9 +63,9 @@ whiteSpaceP :: Parser String
 whiteSpaceP
   = spanP isSpace
 
-fromNullParsedP :: Parser [a] -> Parser [a]
+fromEmptyP :: Parser [a] -> Parser [a]
 -- Pre: The given parser must not parse into Nothing
-fromNullParsedP (Parser p)
+fromEmptyP (Parser p)
   = Parser f
   where
     f input = if null parsed
@@ -74,18 +76,14 @@ fromNullParsedP (Parser p)
 
 removeBracketsP :: Parser a -> Parser a
 removeBracketsP p
-  = p
-    <|> bracketsP p
-    <|> bracketsP (bracketsP p)
-    <|> bracketsP (bracketsP (bracketsP p))
-    <|> bracketsP (bracketsP (bracketsP (bracketsP p)))
-    <|> bracketsP (bracketsP (bracketsP (bracketsP (bracketsP p))))
-    <|> bracketsP (bracketsP (bracketsP (bracketsP (bracketsP (bracketsP p)))))
-    <|> bracketsP (bracketsP (bracketsP (bracketsP (bracketsP (bracketsP (bracketsP p))))))
+  = p <|> bracketsP (removeBracketsP p)
     where
       bracketsP p = charP '(' *> whiteSpaceP *> p <* whiteSpaceP <* charP ')'
 
--- Actual parsing
+(<:>) :: Applicative f => f a -> f [a] -> f [a]
+(<:>) = liftA2 (:)
+
+-- + + + + + + + + + Actual parsing + + + + + + + + +
 
 -- Parsing values and objects
 pyNone' :: Parser PyValue
@@ -94,18 +92,15 @@ pyNone'
 
 pyBool' :: Parser PyValue
 pyBool'
-  = f <$> (stringP "True" <|> stringP "False")
-  where
-    f "True"  = PyBool True
-    f "False" = PyBool False
+  = PyBool True <$ stringP "True"
+  <|> PyBool False <$ stringP "False"
 
 pyInt' :: Parser PyValue
 pyInt'
-  = f <$> ( nextDigitsP <|>
-           (:) <$> charP '-' <*> nextDigitsP)
+  = (PyInt . read) <$>
+  (nextDigitsP <|> (charP '-') <:> nextDigitsP)
   where
-    f = PyInt . read
-    nextDigitsP = fromNullParsedP (spanP isDigit)
+    nextDigitsP = fromEmptyP (spanP isDigit)
 
 pyChar' :: Parser PyValue
 pyChar'
@@ -125,15 +120,15 @@ pyString'
 
 pyList' :: Parser PyValue
 pyList'
-  = PyList <$> (charP '[' *> whiteSpaceP *> elements <* whiteSpaceP <* charP ']')
+  = PyList [] <$ (charP '[' <* whiteSpaceP <* charP ']') <|>
+    PyList <$> (charP '[' *> whiteSpaceP *> elements <* whiteSpaceP <* charP ']')
   where
-    elements = ((:) <$> (pyValue <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
-                <|> pure []
-
+    sepByP sep e = e <:> (many (sep *> e))
+    elements = sepByP (whiteSpaceP *> charP ',' <* whiteSpaceP) pyValue
 
 pyVariable' :: Parser PyValue
 pyVariable'
-  = PyVariable <$> fromNullParsedP (Parser (\input -> do
+  = PyVariable <$> fromEmptyP (Parser (\input -> do
                                             (extra, name) <- runParser (spanP isAlpha) input
                                             if name == "or" || name == "and" || name == "not"
                                             then return (input, "")
@@ -143,7 +138,7 @@ pyDict' :: Parser PyValue
 pyDict'
   = PyDict <$> (charP '{' *> whiteSpaceP *> bindings <* whiteSpaceP <* charP '}')
     where
-      bindings = ((:) <$> (pyPair <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyPair <* whiteSpaceP)) <|> pure []
+      bindings = (pyPair <* whiteSpaceP) <:> many (charP ',' *> whiteSpaceP *> pyPair <* whiteSpaceP) <|> pure []
       pyPair
         = Parser (\input -> do
             (extra, key) <- runParser pyValue input
@@ -153,11 +148,12 @@ pyDict'
 pyFunctionCall' :: Parser PyValue
 pyFunctionCall'
   = PyFunctionCall <$>
-    fromNullParsedP (spanP isAlpha) <*>
-    (whiteSpaceP *> charP '(' *> whiteSpaceP *> arguments <* whiteSpaceP <* charP ')')
+    fromEmptyP (spanP isAlpha) <*>
+    (([] <$ (whiteSpaceP *> charP '(' *> whiteSpaceP *> charP ')'))  <|>
+    (whiteSpaceP *> charP '(' *> whiteSpaceP *> arguments <* whiteSpaceP <* charP ')'))
     where
-      arguments = ((:) <$> (pyValue <* whiteSpaceP) <*> many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP))
-                  <|> pure []
+      arguments = (pyValue <* whiteSpaceP) <:>
+                many (charP ',' *> whiteSpaceP *> pyValue <* whiteSpaceP)
 
 pyNone         = removeBracketsP pyNone'
 pyBool         = removeBracketsP pyBool'
@@ -181,86 +177,83 @@ pyArithmVal :: Parser ArithmExpr
 pyArithmVal
   = ArithmVal <$> (pyInt <|> pyFunctionCall <|> pyVariable)
 
+fromInfixP :: Parser a -> Parser b -> Parser c -> (a -> b -> d) -> Parser d
+fromInfixP t1P t2P op build
+  = do
+      t1 <- t1P
+      whiteSpaceP
+      op
+      whiteSpaceP
+      t2 <- t2P
+      return (build t1 t2)
+
 pyArithmExpr :: Parser ArithmExpr
-pyArithmExpr
-  = Parser (\input -> do
-      (extra, expr) <- runParser (many ((opP <|> valP) <* whiteSpaceP)) input
-      if expr == []
-      then Nothing
-      else return (extra, (fst . convertBack . reverse . postfix) expr))
-  where
-    opP = Left <$> (stringP "(" <|> stringP ")" <|> foldl1 (<|>) (map stringP arithmOps))
-    valP = Right <$> pyArithmVal
-    postfix :: [Either Symbol ArithmExpr] -> [Either Symbol ArithmExpr]
-    postfix = postfix' []
+pyArithmExpr = fromRA <$> (fromInfixP termP pyArithmExpr (charP '+') Plus
+        <|> fromInfixP termP pyArithmExpr (charP '-') Minus)
+        <|> termP
       where
-        postfix' stack [] = map Left stack
-        postfix' stack ((Left x) : expr')
-          | x == "("  = postfix' (x : stack) expr'
-          | x == ")"  = map Left opsInBrackets ++ postfix' newStack expr'
-          | otherwise = map Left higherPrecedence ++ postfix' newStack' expr'
-          where
-            (opsInBrackets, _ : newStack) = span (/="(") stack
-            (higherPrecedence, newStack'') = span (\y -> y /= "(" && lookUp y precedences >= lookUp x precedences) stack
-            newStack' = x : newStack''
-        postfix' stack ((Right x) : expr')
-          = Right x : postfix' stack expr'
-    -- From reversed postfix to the needed expression of type ArithmExpr
-    convertBack :: [Either Symbol ArithmExpr] -> (ArithmExpr, [Either Symbol ArithmExpr])
-    convertBack [] = error "A case yet to be solved!"
-    convertBack (Left x : expr') = ((lookUp x equivTable) nextExpression' nextExpression, extra)
+        fromRA (Plus a (Plus b c)) = Plus (Plus a b) c
+        fromRA (Plus a (Minus b c)) = Minus (Plus a b) c
+        fromRA (Minus a (Plus b c)) = Plus (Minus a b) c
+        fromRA (Minus a (Minus b c)) = Minus (Minus a b) c
+        fromRA x = x
+
+termP :: Parser ArithmExpr
+termP = fromRA <$> (fromInfixP factor termP (charP '*') Mul
+        <|> fromInfixP factor termP (charP '/') Div
+        <|> fromInfixP factor termP (charP '%') Mod)
+        <|> factor
       where
-        equivTable = zip arithmOps [Pow, Mod, Mul, Div, Plus, Minus]
-        (nextExpression, extra') = convertBack expr'
-        (nextExpression', extra) = convertBack extra'
-    convertBack (Right x : expr') = (x, expr')
-    -- Helper lookup
-    lookUp :: Eq a => a -> [(a, b)] -> b
-    lookUp
-      = ((.) . (.)) fromJust lookup
+        fromRA (Mul a (Mul b c)) = Mul (Mul a b) c
+        fromRA (Mul a (Div b c)) = Div (Mul a b) c
+        fromRA (Div a (Mul b c)) = Mul (Div a b) c
+        fromRA (Div a (Div b c)) = Div (Div a b) c
+        fromRA x = x
+
+factor :: Parser ArithmExpr
+factor = fromInfixP base factor (stringP "**") Pow
+        <|> base
+
+base :: Parser ArithmExpr
+base = charP '(' *> whiteSpaceP *> pyArithmExpr <* whiteSpaceP <* charP ')'
+        <|> pyArithmVal
 
 -- Parsing boolean expressions
+pyBoolExpr :: Parser BoolExpr
+pyBoolExpr = fromRA <$> fromInfixP disjunctP pyBoolExpr (stringP "or") Or
+          <|>  disjunctP
+          where
+            fromRA (Or a (Or b c)) = Or (Or a b) c
+            fromRA (Or a (And b c)) = And (Or a b) c
+            fromRA (And a (Or b c)) = Or (And a b) c
+            fromRA (And a (And b c)) = And (And a b) c
+            fromRA x = x
+
+disjunctP :: Parser BoolExpr
+disjunctP = fromRA <$> fromInfixP conjuctP disjunctP (stringP "and") And
+          <|>  conjuctP
+          where
+            fromRA (Or a (Or b c)) = Or (Or a b) c
+            fromRA (Or a (And b c)) = And (Or a b) c
+            fromRA (And a (Or b c)) = Or (And a b) c
+            fromRA (And a (And b c)) = And (And a b) c
+            fromRA x = x
+
+conjuctP :: Parser BoolExpr
+conjuctP = Not <$> (stringP "not " *> whiteSpaceP *> pyAtom)
+          <|> pyAtom
+
 pyAtom :: Parser BoolExpr
 pyAtom
-  = Atom <$> pyValue  -- It is for the interpreting stage to decide if it is boolean
-
--- Pretty gross I know. Feel free to manipulate the parsers without input.
--- That would be more concise but I dont immediately see how
--- pyNot :: Parser BoolExpr
--- pyNot
---  = Parser (\input -> do
---    (extra, _)          <- runParser (stringP "not") input
---    (extra', _)         <- runParser (charP ' ') extra
---    (extra'', _)        <- runParser whiteSpaceP extra'
---    (extra''', boolExp) <- runParser pyBoolExpr extra''
---    return (extra''', Not boolExp)
---    )
--- could be just stringP "not " *> whiteSpaceP *> pyBoolExpr ?
-
-pyPurelyBoolExpr :: Parser BoolExpr
-pyPurelyBoolExpr
-  -- Use Parser Monad do notation
-  = do
-      symbols <- many ((opP <|> valP) <* whiteSpaceP)
-      if symbols == []
-      then return (Atom PyNone)  -- for now
-      else return ((fst . convertBack . reverse . postfix) symbols)
-  where
-    postfix = undefined
-    convertBack = undefined
-    opP = Left <$> (stringP "(" <|> stringP ")" <|> foldl1 (<|>) (map stringP booleanOps))
-    valP = Right <$> pyAtom
-
+  = charP '(' *> whiteSpaceP *> pyBoolExpr <* whiteSpaceP <* charP ')'
+    <|> pyComp
+    <|> Atom <$> pyValue
 
 pyComp :: Parser BoolExpr
--- Will leave it with pyValues, for now
--- I am pretty sure we will be changing this in the future
 pyComp
-  = Comp <$> pyValue <* whiteSpaceP <*> foldl1 (<|>) (map stringP comps) <* whiteSpaceP <*> pyValue
-
-pyBoolExpr :: Parser BoolExpr
-pyBoolExpr
-  = pyPurelyBoolExpr <|> pyComp
+  = Comp <$> pyValue <* whiteSpaceP
+  <*> foldl1 (<|>) (map stringP comps) <* whiteSpaceP
+  <*> pyValue
 
 -- Parsing procedures
 pyAssignment :: Parser Procedure
